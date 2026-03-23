@@ -32,24 +32,34 @@ export default function App() {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
-      const [textResponse, extImageRes, intImageRes, detailImageRes] = await Promise.all([
+      const [textResponse, imgRes1, imgRes2, imgRes3, imgRes4, imgRes5] = await Promise.all([
         ai.models.generateContent({
           model: "gemini-3-flash-preview",
-          contents: `Generate a highly detailed, professional architectural dossier for: "${prompt}". The design MUST be strictly eco-friendly, highly sustainable, minimal modern, zero-maintenance, earthquake-resistant, and extreme-weather-resistant. Structure the response with these exact headings (do not use markdown asterisks, just type the heading in ALL CAPS and a newline): EXECUTIVE SUMMARY, EXTERIOR & SITE INTEGRATION, INTERIOR & SPATIAL LAYOUT, SUSTAINABLE MATERIALS & RESILIENCE. Keep it professional and in-depth (around 600 words).`,
+          contents: `Generate a highly detailed, professional architectural dossier for: "${prompt}". The design MUST be strictly eco-friendly, highly sustainable, minimal modern, zero-maintenance, earthquake-resistant, and extreme-weather-resistant. Structure the response with EXACTLY these 5 headings (do not use markdown asterisks, just type the heading in ALL CAPS and a newline): EXECUTIVE SUMMARY, EXTERIOR ARCHITECTURE, INTERIOR SPATIAL LAYOUT, MATERIALITY & RESILIENCE, LIGHTING & ATMOSPHERE. Keep it professional and in-depth (around 800 words).`,
         }),
         ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: `Exterior architectural visualization of: ${prompt}. Eco-friendly, sustainable architecture, minimal modern design, highly durable maintenance-free materials, weather-resistant, earthquake-resilient structure, seamlessly integrated with nature. High quality, photorealistic, wide angle.` }] },
+          contents: { parts: [{ text: `Hero exterior architectural visualization of: ${prompt}. Eco-friendly, minimal modern design, seamlessly integrated with nature. High quality, photorealistic, wide angle.` }] },
           config: { imageConfig: { aspectRatio: "16:9" } }
         }),
         ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: `Interior architectural visualization of: ${prompt}. Eco-friendly, sustainable architecture, minimal modern design, natural light, raw durable materials like cross-laminated timber and rammed earth. High quality, photorealistic, interior photography.` }] },
+          contents: { parts: [{ text: `Landscape and site integration of: ${prompt}. Eco-friendly, sustainable architecture, minimal modern design, weather-resistant structure. High quality, photorealistic.` }] },
           config: { imageConfig: { aspectRatio: "16:9" } }
         }),
         ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: `Close-up architectural detail shot of: ${prompt}. Showing sustainable, zero-maintenance, weather-resistant materials (e.g., green roof, seismic base isolation joints, raw concrete, recycled steel). High quality, photorealistic, macro photography.` }] },
+          contents: { parts: [{ text: `Interior architectural visualization of: ${prompt}. Eco-friendly, minimal modern design, natural light, raw durable materials. High quality, photorealistic, interior photography.` }] },
+          config: { imageConfig: { aspectRatio: "16:9" } }
+        }),
+        ai.models.generateContent({
+          model: 'gemini-2.5-flash-image',
+          contents: { parts: [{ text: `Close-up architectural detail shot of: ${prompt}. Showing sustainable, zero-maintenance materials (e.g., green roof, raw concrete, recycled steel). High quality, photorealistic, macro photography.` }] },
+          config: { imageConfig: { aspectRatio: "16:9" } }
+        }),
+        ai.models.generateContent({
+          model: 'gemini-2.5-flash-image',
+          contents: { parts: [{ text: `Night time architectural visualization of: ${prompt}. Minimal modern design, warm atmospheric lighting, eco-friendly, sustainable. High quality, photorealistic.` }] },
           config: { imageConfig: { aspectRatio: "16:9" } }
         })
       ]);
@@ -70,70 +80,95 @@ export default function App() {
         return null;
       };
 
-      const extImg = extractImage(extImageRes);
-      const intImg = extractImage(intImageRes);
-      const detImg = extractImage(detailImageRes);
+      const img1 = extractImage(imgRes1);
+      const img2 = extractImage(imgRes2);
+      const img3 = extractImage(imgRes3);
+      const img4 = extractImage(imgRes4);
+      const img5 = extractImage(imgRes5);
 
       const doc = new jsPDF();
+      const margin = 20;
       const pageWidth = doc.internal.pageSize.getWidth();
-      const margin = 15;
-      const contentWidth = pageWidth - margin * 2;
-      let currentY = 20;
-
-      const addText = (textStr, fontSize, isBold = false) => {
-        doc.setFont("helvetica", isBold ? "bold" : "normal");
-        doc.setFontSize(fontSize);
-        const lines = doc.splitTextToSize(textStr, contentWidth);
-        for (let i = 0; i < lines.length; i++) {
-          if (currentY > 280) {
-            doc.addPage();
-            currentY = 20;
-          }
-          doc.text(lines[i], margin, currentY);
-          currentY += (fontSize * 0.4);
-        }
-        currentY += 5;
-      };
-
-      const addImg = (imgObj, height = 100, caption = "") => {
-        if (!imgObj) return;
-        if (currentY + height + 15 > 280) {
-          doc.addPage();
-          currentY = 20;
-        }
-        doc.addImage(imgObj.data, imgObj.format, margin, currentY, contentWidth, height);
-        currentY += height + 5;
-        if (caption) {
-          addText(caption, 9, false);
-        }
-        currentY += 5;
-      };
-
-      addText("ARCHITECTURAL DOSSIER", 22, true);
-      addText(`Project Vision: ${prompt}`, 12, false);
-      currentY += 5;
-
-      if (extImg) {
-        addImg(extImg, 100, "Figure 1: Exterior & Site Integration");
+      const imgWidth = pageWidth - (margin * 2);
+      const textWidth = 130; // Narrower text column for modern editorial look
+      
+      // COVER PAGE
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(28);
+      doc.text("ARCHITECTURAL DOSSIER", margin, 40);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      const titleLines = doc.splitTextToSize(`VISION: ${prompt.toUpperCase()}`, imgWidth);
+      doc.text(titleLines, margin, 55);
+      
+      if (img1) {
+        doc.addImage(img1.data, img1.format, margin, 75, imgWidth, imgWidth * (9/16));
       }
-
-      const paragraphs = text.split('\n').filter(p => p.trim() !== '');
-      const third = Math.floor(paragraphs.length / 3);
-      const twoThird = third * 2;
-
-      paragraphs.forEach((p, idx) => {
-        const isHeading = p === p.toUpperCase() && p.length < 60;
-        addText(p, isHeading ? 14 : 11, isHeading);
-        
-        if (idx === third && intImg) {
-          addImg(intImg, 100, "Figure 2: Interior Spatial Layout");
-        }
-        if (idx === twoThird && detImg) {
-          addImg(detImg, 100, "Figure 3: Materiality & Resilience Details");
+      
+      doc.setFontSize(9);
+      doc.text("GENERATED BY AI ARCHITECT", margin, 280);
+      
+      // CONTENT PAGES
+      let currentY = 20;
+      doc.addPage();
+      
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+      let sections = [];
+      let currentSection = { heading: 'EXECUTIVE SUMMARY', content: [] };
+      
+      lines.forEach(line => {
+        // Identify headings (ALL CAPS, short, no periods at end usually)
+        if (line === line.toUpperCase() && line.length < 60 && line.length > 3 && !line.endsWith('.')) {
+          if (currentSection.content.length > 0 || currentSection.heading !== 'EXECUTIVE SUMMARY') {
+            sections.push(currentSection);
+          }
+          currentSection = { heading: line, content: [] };
+        } else {
+          currentSection.content.push(line);
         }
       });
+      sections.push(currentSection);
       
-      doc.save("professional-architecture-dossier.pdf");
+      const sectionImages = [null, img2, img3, img4, img5];
+      
+      sections.forEach((sec, idx) => {
+        if (currentY > 220) { doc.addPage(); currentY = 20; }
+        
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.setTextColor(0, 0, 0);
+        doc.text(sec.heading, margin, currentY);
+        currentY += 12;
+        
+        const secImg = sectionImages[idx];
+        if (secImg) {
+          const imgHeight = imgWidth * (9/16);
+          if (currentY + imgHeight > 270) {
+            doc.addPage(); currentY = 20;
+          }
+          doc.addImage(secImg.data, secImg.format, margin, currentY, imgWidth, imgHeight);
+          currentY += imgHeight + 12;
+        }
+        
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.setTextColor(60, 60, 60);
+        
+        sec.content.forEach(p => {
+          const splitP = doc.splitTextToSize(p, textWidth);
+          if (currentY + (splitP.length * 5) > 280) {
+            doc.addPage(); currentY = 20;
+          }
+          doc.text(splitP, margin, currentY);
+          currentY += (splitP.length * 5) + 6;
+        });
+        
+        currentY += 10;
+      });
+      
+      doc.save("minimal-modern-dossier.pdf");
 
       setIsModalOpen(false);
       setPrompt("");
@@ -204,7 +239,7 @@ export default function App() {
                 className="bg-primary text-on-primary px-6 py-3 text-[10px] uppercase tracking-widest font-semibold hover:bg-primary-dim transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {isGenerating ? (
-                  <><Loader2 size={14} className="animate-spin" /> Drafting Dossier...</>
+                  <><Loader2 size={14} className="animate-spin" /> Drafting 5-Part Dossier...</>
                 ) : (
                   <><FileText size={14} /> Generate PDF</>
                 )}
@@ -461,7 +496,7 @@ export default function App() {
               {isGenerating ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  Drafting Dossier & Renderings...
+                  Drafting 5-Part Dossier & Renderings...
                 </>
               ) : (
                 <>
