@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useState } from "react";
 import {
   Menu,
   Layers,
@@ -14,9 +15,135 @@ import {
   LayoutGrid,
   MessageSquare,
   User,
+  X,
+  Loader2
 } from "lucide-react";
+import { jsPDF } from "jspdf";
+import { GoogleGenAI } from "@google/genai";
 
 export default function App() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [prompt, setPrompt] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerateAndDownload = async () => {
+    if (!prompt.trim()) return;
+    setIsGenerating(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      
+      const [textResponse, extImageRes, intImageRes, detailImageRes] = await Promise.all([
+        ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: `Generate a highly detailed, professional architectural dossier for: "${prompt}". The design MUST be strictly eco-friendly, highly sustainable, minimal modern, zero-maintenance, earthquake-resistant, and extreme-weather-resistant. Structure the response with these exact headings (do not use markdown asterisks, just type the heading in ALL CAPS and a newline): EXECUTIVE SUMMARY, EXTERIOR & SITE INTEGRATION, INTERIOR & SPATIAL LAYOUT, SUSTAINABLE MATERIALS & RESILIENCE. Keep it professional and in-depth (around 600 words).`,
+        }),
+        ai.models.generateContent({
+          model: 'gemini-2.5-flash-image',
+          contents: { parts: [{ text: `Exterior architectural visualization of: ${prompt}. Eco-friendly, sustainable architecture, minimal modern design, highly durable maintenance-free materials, weather-resistant, earthquake-resilient structure, seamlessly integrated with nature. High quality, photorealistic, wide angle.` }] },
+          config: { imageConfig: { aspectRatio: "16:9" } }
+        }),
+        ai.models.generateContent({
+          model: 'gemini-2.5-flash-image',
+          contents: { parts: [{ text: `Interior architectural visualization of: ${prompt}. Eco-friendly, sustainable architecture, minimal modern design, natural light, raw durable materials like cross-laminated timber and rammed earth. High quality, photorealistic, interior photography.` }] },
+          config: { imageConfig: { aspectRatio: "16:9" } }
+        }),
+        ai.models.generateContent({
+          model: 'gemini-2.5-flash-image',
+          contents: { parts: [{ text: `Close-up architectural detail shot of: ${prompt}. Showing sustainable, zero-maintenance, weather-resistant materials (e.g., green roof, seismic base isolation joints, raw concrete, recycled steel). High quality, photorealistic, macro photography.` }] },
+          config: { imageConfig: { aspectRatio: "16:9" } }
+        })
+      ]);
+
+      const text = textResponse.text || "Plan generated.";
+      
+      const extractImage = (res) => {
+        if (res.candidates?.[0]?.content?.parts) {
+          for (const part of res.candidates[0].content.parts) {
+            if (part.inlineData) {
+              return {
+                data: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
+                format: part.inlineData.mimeType === 'image/jpeg' ? 'JPEG' : 'PNG'
+              };
+            }
+          }
+        }
+        return null;
+      };
+
+      const extImg = extractImage(extImageRes);
+      const intImg = extractImage(intImageRes);
+      const detImg = extractImage(detailImageRes);
+
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 15;
+      const contentWidth = pageWidth - margin * 2;
+      let currentY = 20;
+
+      const addText = (textStr, fontSize, isBold = false) => {
+        doc.setFont("helvetica", isBold ? "bold" : "normal");
+        doc.setFontSize(fontSize);
+        const lines = doc.splitTextToSize(textStr, contentWidth);
+        for (let i = 0; i < lines.length; i++) {
+          if (currentY > 280) {
+            doc.addPage();
+            currentY = 20;
+          }
+          doc.text(lines[i], margin, currentY);
+          currentY += (fontSize * 0.4);
+        }
+        currentY += 5;
+      };
+
+      const addImg = (imgObj, height = 100, caption = "") => {
+        if (!imgObj) return;
+        if (currentY + height + 15 > 280) {
+          doc.addPage();
+          currentY = 20;
+        }
+        doc.addImage(imgObj.data, imgObj.format, margin, currentY, contentWidth, height);
+        currentY += height + 5;
+        if (caption) {
+          addText(caption, 9, false);
+        }
+        currentY += 5;
+      };
+
+      addText("ARCHITECTURAL DOSSIER", 22, true);
+      addText(`Project Vision: ${prompt}`, 12, false);
+      currentY += 5;
+
+      if (extImg) {
+        addImg(extImg, 100, "Figure 1: Exterior & Site Integration");
+      }
+
+      const paragraphs = text.split('\n').filter(p => p.trim() !== '');
+      const third = Math.floor(paragraphs.length / 3);
+      const twoThird = third * 2;
+
+      paragraphs.forEach((p, idx) => {
+        const isHeading = p === p.toUpperCase() && p.length < 60;
+        addText(p, isHeading ? 14 : 11, isHeading);
+        
+        if (idx === third && intImg) {
+          addImg(intImg, 100, "Figure 2: Interior Spatial Layout");
+        }
+        if (idx === twoThird && detImg) {
+          addImg(detImg, 100, "Figure 3: Materiality & Resilience Details");
+        }
+      });
+      
+      doc.save("professional-architecture-dossier.pdf");
+
+      setIsModalOpen(false);
+      setPrompt("");
+    } catch (error) {
+      console.error(error);
+      alert("Failed to generate plan. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
   return (
     <div className="min-h-screen bg-surface text-on-surface selection:bg-secondary/30 pb-24 md:pb-0">
       {/* TopAppBar */}
@@ -50,20 +177,37 @@ export default function App() {
           </div>
           <div className="relative z-10 max-w-5xl">
             <p className="text-[10px] uppercase tracking-[0.3em] text-on-primary mb-4 font-medium">
-              Commercial / 2024
+              Sustainable / Resilient / 2024
             </p>
             <h1 className="text-5xl md:text-7xl font-serif text-on-primary leading-tight mb-8">
-              Modern
+              Resilient
               <br />
-              Concrete Cafe
+              Eco-Architecture
             </h1>
-            <div className="flex flex-wrap gap-8 items-center border-t border-on-primary/20 pt-8">
-              <button className="bg-primary text-on-primary px-8 py-4 text-[10px] uppercase tracking-widest hover:bg-primary-dim transition-colors font-semibold">
-                Inquire Now
-              </button>
-              <button className="text-on-primary text-[10px] uppercase tracking-widest flex items-center gap-2 hover:opacity-70 transition-opacity font-medium">
-                <Layers size={16} strokeWidth={1.5} />
-                Save to Moodboard
+            <div className="mt-8 bg-inverse-surface/40 backdrop-blur-md border border-on-primary/20 p-2 flex flex-col md:flex-row gap-2 max-w-2xl">
+              <input
+                type="text"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="e.g. An off-grid minimal eco-retreat in a dense forest..."
+                className="flex-1 bg-transparent text-on-primary placeholder:text-on-primary/60 outline-none px-4 py-2 font-sans text-sm"
+                disabled={isGenerating}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && prompt.trim() && !isGenerating) {
+                    handleGenerateAndDownload();
+                  }
+                }}
+              />
+              <button 
+                onClick={handleGenerateAndDownload}
+                disabled={!prompt.trim() || isGenerating}
+                className="bg-primary text-on-primary px-6 py-3 text-[10px] uppercase tracking-widest font-semibold hover:bg-primary-dim transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isGenerating ? (
+                  <><Loader2 size={14} className="animate-spin" /> Drafting Dossier...</>
+                ) : (
+                  <><FileText size={14} /> Generate PDF</>
+                )}
               </button>
             </div>
           </div>
@@ -97,15 +241,15 @@ export default function App() {
                     Materials
                   </p>
                   <p className="text-sm font-sans leading-relaxed text-on-surface">
-                    Raw Concrete, Oak, Brushed Steel
+                    Cross-Laminated Timber, Recycled Steel, Rammed Earth
                   </p>
                 </div>
                 <div>
                   <p className="text-[9px] uppercase tracking-widest text-on-surface-variant mb-1">
-                    Duration
+                    Resilience
                   </p>
                   <p className="text-xl font-serif text-on-surface">
-                    14 Months
+                    Seismic Base Isolation
                   </p>
                 </div>
               </div>
@@ -115,8 +259,7 @@ export default function App() {
                 The Blueprint
               </p>
               <p className="text-sm text-on-surface-variant leading-relaxed">
-                A study in light and shadow, exploring the textural contrast of
-                industrial materials against organic human interaction.
+                A study in sustainable endurance. Exploring the intersection of minimal modernism with zero-maintenance, weather-resistant, and earthquake-proof engineering.
               </p>
               <div className="pt-4 flex items-center gap-4 text-outline font-mono text-[10px]">
                 <span>01</span>
@@ -134,18 +277,10 @@ export default function App() {
               </h2>
               <div className="space-y-6 text-on-surface-variant leading-relaxed text-lg font-light">
                 <p>
-                  The Modern Concrete Cafe was born from a desire to strip away
-                  the artifice of traditional retail spaces. We approached the
-                  site as a monolith, carving out volumes to invite the northern
-                  light to play across the brutalist surfaces throughout the
-                  day.
+                  Our architecture is born from a desire to strip away the artifice of traditional construction while fortifying against the unpredictable. We approach every site with a minimal modern ethos, carving out volumes that invite natural light while utilizing zero-maintenance, hyper-durable materials.
                 </p>
                 <p>
-                  Every seam in the concrete and every grain in the
-                  hand-selected white oak was considered as a structural element
-                  of the narrative. The silence of the space is its primary
-                  luxury, providing a sanctuary of stillness in the urban
-                  center.
+                  Every seam in the structure is engineered for extreme weather resistance and seismic stability. The silence of the space is its primary luxury, providing a sustainable, eco-friendly sanctuary that stands unyielding against the elements.
                 </p>
               </div>
             </div>
@@ -162,16 +297,19 @@ export default function App() {
                       material schedules ready for construction.
                     </p>
                   </div>
-                  <button className="flex items-center gap-4 bg-surface-container-high hover:bg-surface-container-highest transition-colors px-6 py-4 border border-outline-variant/20 group">
+                  <button 
+                    onClick={() => setIsModalOpen(true)}
+                    className="flex items-center gap-4 bg-surface-container-high hover:bg-surface-container-highest transition-colors px-6 py-4 border border-outline-variant/20 group w-full md:w-auto text-left"
+                  >
                     <div className="w-12 h-12 flex items-center justify-center bg-primary text-on-primary shrink-0">
                       <FileText size={20} strokeWidth={1.5} />
                     </div>
                     <div className="text-left flex-1">
                       <div className="text-[10px] uppercase tracking-widest font-bold text-on-surface">
-                        Download Full Architectural Plan
+                        Generate & Download Plan
                       </div>
                       <div className="text-[9px] uppercase tracking-widest text-on-surface-variant mt-0.5">
-                        PDF Format, 24MB
+                        AI-Generated PDF
                       </div>
                     </div>
                     <Download
@@ -287,6 +425,54 @@ export default function App() {
           </span>
         </a>
       </nav>
+
+      {/* Generation Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-inverse-surface/80 backdrop-blur-sm p-4">
+          <div className="bg-surface w-full max-w-lg p-8 shadow-2xl relative border border-outline-variant/20">
+            <button 
+              onClick={() => !isGenerating && setIsModalOpen(false)}
+              className="absolute top-6 right-6 text-outline hover:text-on-surface transition-colors"
+              disabled={isGenerating}
+            >
+              <X size={24} strokeWidth={1.5} />
+            </button>
+            
+            <h3 className="text-2xl font-serif text-on-surface mb-2">
+              Design Your Plan
+            </h3>
+            <p className="text-sm text-on-surface-variant mb-6 font-light">
+              Describe your vision. Our AI architect will draft a multi-page professional dossier including exterior, interior, and detail renderings for you to download as a PDF.
+            </p>
+            
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="e.g. An off-grid minimal eco-retreat in a dense forest, focusing on natural light and zero-maintenance..."
+              className="w-full bg-surface-container-low border-b border-outline focus:border-secondary outline-none p-4 text-sm font-sans resize-none h-32 transition-colors text-on-surface placeholder:text-outline-variant"
+              disabled={isGenerating}
+            />
+            
+            <button 
+              onClick={handleGenerateAndDownload}
+              disabled={!prompt.trim() || isGenerating}
+              className="bg-primary text-on-primary px-8 py-4 text-[10px] uppercase tracking-widest font-semibold hover:bg-primary-dim transition-colors w-full mt-6 flex justify-center items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Drafting Dossier & Renderings...
+                </>
+              ) : (
+                <>
+                  <FileText size={16} />
+                  Generate PDF
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
