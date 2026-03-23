@@ -32,6 +32,8 @@ export default function App() {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
+      const designPhilosophy = "CRITICAL: Maintain strict visual consistency. The design MUST feature the exact same minimal modern eco-friendly architecture, identical raw materials (concrete, timber, steel), and cohesive geometry across all views. High-end, photorealistic architectural photography.";
+
       const [textResponse, imgRes1, imgRes2, imgRes3, imgRes4, imgRes5] = await Promise.all([
         ai.models.generateContent({
           model: "gemini-3-flash-preview",
@@ -39,27 +41,27 @@ export default function App() {
         }),
         ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: `Hero exterior architectural visualization of: ${prompt}. Eco-friendly, minimal modern design, seamlessly integrated with nature. High quality, photorealistic, wide angle.` }] },
+          contents: { parts: [{ text: `Hero exterior architectural visualization of: ${prompt}. ${designPhilosophy} Wide angle, seamlessly integrated with nature.` }] },
           config: { imageConfig: { aspectRatio: "16:9" } }
         }),
         ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: `Landscape and site integration of: ${prompt}. Eco-friendly, sustainable architecture, minimal modern design, weather-resistant structure. High quality, photorealistic.` }] },
+          contents: { parts: [{ text: `Landscape and site integration view of the EXACT SAME building from: ${prompt}. ${designPhilosophy} Weather-resistant structure.` }] },
           config: { imageConfig: { aspectRatio: "16:9" } }
         }),
         ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: `Interior architectural visualization of: ${prompt}. Eco-friendly, minimal modern design, natural light, raw durable materials. High quality, photorealistic, interior photography.` }] },
+          contents: { parts: [{ text: `Interior architectural visualization of the EXACT SAME building from: ${prompt}. ${designPhilosophy} Natural light, interior photography.` }] },
           config: { imageConfig: { aspectRatio: "16:9" } }
         }),
         ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: `Close-up architectural detail shot of: ${prompt}. Showing sustainable, zero-maintenance materials (e.g., green roof, raw concrete, recycled steel). High quality, photorealistic, macro photography.` }] },
+          contents: { parts: [{ text: `Close-up architectural detail shot of the EXACT SAME building from: ${prompt}. ${designPhilosophy} Showing sustainable, zero-maintenance materials. Macro photography.` }] },
           config: { imageConfig: { aspectRatio: "16:9" } }
         }),
         ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: `Night time architectural visualization of: ${prompt}. Minimal modern design, warm atmospheric lighting, eco-friendly, sustainable. High quality, photorealistic.` }] },
+          contents: { parts: [{ text: `Night time exterior architectural visualization of the EXACT SAME building from: ${prompt}. ${designPhilosophy} Warm atmospheric lighting.` }] },
           config: { imageConfig: { aspectRatio: "16:9" } }
         })
       ]);
